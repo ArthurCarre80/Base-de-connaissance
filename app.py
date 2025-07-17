@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
+import re
 
-# Chargement du fichier Excel
 @st.cache_data
 def charger_donnees():
     df = pd.read_excel("Produits boutté.xlsx")
@@ -9,25 +9,38 @@ def charger_donnees():
     return df
 
 df = charger_donnees()
+champs_disponibles = df.columns.tolist()
 
-# Fonction de recherche
-def recherche_inversee(terme):
-    filtre = df[df.apply(lambda row: row.astype(str).str.contains(terme, case=False, na=False).any(), axis=1)]
-    return filtre
+# Extraction automatique du champ demandé
+def extraire_champ(question):
+    question_lower = question.lower()
+    for champ in champs_disponibles:
+        champ_simplifie = champ.replace("_", " ").replace("(", "").replace(")", "")
+        if any(mot in question_lower for mot in champ_simplifie.split()):
+            return champ
+    return None
 
-# Fonction pour surligner les résultats
-def surligner(val):
-    return "background-color: yellow" if isinstance(val, str) and recherche.lower() in val.lower() else ""
+# Nettoyage du libellé produit supposé
+def extraire_terme_recherche(question, champ_detecte):
+    nettoyé = re.sub(rf"\b({champ_detecte.replace('_', ' ')})\b", "", question, flags=re.I)
+    mots = re.findall(r"\w{3,}", nettoyé.lower())
+    return " ".join(mots)
 
-# Interface utilisateur
-st.title("🔍 Base de Connaissance - Catalogue Boutté")
-recherche = st.text_input("Entrez un mot-clé à rechercher dans tout le catalogue :")
+# Interface
+st.title("🔎 Assistant Catalogue Boutté — langage naturel")
+question = st.text_input("Pose une question comme : « Quel est le code EAN du nez de robinet 15x21 ? »")
 
-if recherche:
-    resultat = recherche_inversee(recherche)
-    if not resultat.empty:
-        st.write(f"🎯 Résultats pour : `{recherche}`")
-        styled = resultat.style.applymap(surligner)
-        st.dataframe(styled, use_container_width=True)
+if question:
+    champ = extraire_champ(question)
+    if not champ:
+        st.warning("Je n’ai pas compris quel champ tu recherches. Reformule ou sois plus précis.")
     else:
-        st.warning("Aucun résultat trouvé.")
+        lib_recherche = extraire_terme_recherche(question, champ)
+        resultat = df[df["libellé_du_produit_(libre)"].str.contains(lib_recherche, case=False, na=False)]
+
+        if resultat.empty:
+            st.warning(f"Aucun produit trouvé contenant : `{lib_recherche}`")
+        else:
+            valeur = resultat[champ].values[0]
+            produit = resultat["libellé_du_produit_(libre)"].values[0]
+            st.success(f"🔍 **{champ.replace('_', ' ').capitalize()}** pour **{produit}** : `{valeur}`")
