@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 
@@ -12,10 +11,22 @@ df = charger_donnees()
 
 st.title("🔍 Catalogue Boutté - Recherche Produits")
 
-recherche = st.text_input("Rechercher un produit par libellé, code EAN ou référence")
+recherche = st.text_input("🔎 Rechercher (valeur présente dans n'importe quelle colonne)")
 
 if recherche:
-    filtre = df[df.apply(lambda row: row.astype(str).str.contains(recherche, case=False).any(), axis=1)]
-    st.dataframe(filtre)
+    # Filtrer
+    mask = df.apply(lambda row: row.astype(str).str.contains(recherche, case=False, na=False).any(), axis=1)
+    resultats = df[mask].copy()
+
+    # Surlignage
+    def surligner(val):
+        val_str = str(val)
+        if recherche.lower() in val_str.lower():
+            return f"background-color: yellow"
+        return ""
+
+    styled = resultats.style.applymap(surligner)
+    st.write(f"🔍 Résultats pour : `{recherche}`")
+    st.dataframe(styled, use_container_width=True)
 else:
-    st.dataframe(df.head(50))
+    st.dataframe(df.head(50), use_container_width=True)
