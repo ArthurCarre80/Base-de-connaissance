@@ -8,38 +8,25 @@ def charger_donnees():
     return pd.read_excel("Produits boutté.xlsx")
 
 df = charger_donnees()
-colonnes = df.columns.str.lower()
 
-st.title("🔍 Recherche inversée - Catalogue Boutté")
+st.title("🔍 Catalogue Boutté - Recherche Produits")
 
-recherche = st.text_input("Tapez une valeur connue + le champ souhaité (ex : '000651 libellé', 'Lance 20x27 référence')")
-
-def recherche_inversee(input_text):
-    mots = input_text.lower().strip().split()
-    if not mots:
-        return pd.DataFrame()
-    
-    champ_cible = None
-    # Identifier si un des mots correspond à une colonne
-    for mot in mots:
-        if mot in colonnes.values:
-            champ_cible = mot
-            mots.remove(mot)
-            break
-    
-    filtre = df[df.apply(lambda row: all(any(mot in str(val).lower() for val in row) for mot in mots), axis=1)]
-    
-    if champ_cible:
-        if champ_cible in colonnes.values:
-            return filtre[[champ_cible]]
-    return filtre
+recherche = st.text_input("🔎 Rechercher (valeur présente dans n'importe quelle colonne)")
 
 if recherche:
-    resultat = recherche_inversee(recherche)
-    if not resultat.empty:
-        st.write(f"🎯 Résultat pour : `{recherche}`")
-        st.dataframe(resultat, use_container_width=True)
-    else:
-        st.warning("Aucun résultat trouvé.")
+    # Filtrer
+    mask = df.apply(lambda row: row.astype(str).str.contains(recherche, case=False, na=False).any(), axis=1)
+    resultats = df[mask].copy()
+
+    # Surlignage
+    def surligner(val):
+        val_str = str(val)
+        if recherche.lower() in val_str.lower():
+            return f"background-color: yellow"
+        return ""
+
+    styled = resultats.style.applymap(surligner)
+    st.write(f"🔍 Résultats pour : `{recherche}`")
+    st.dataframe(styled, use_container_width=True)
 else:
-    st.info("🔎 Exemple : `000651 libellé` ou `Lance 20x27 référence`")
+    st.dataframe(df.head(50), use_container_width=True)
