@@ -9,38 +9,53 @@ def charger_donnees():
     return df
 
 df = charger_donnees()
-champs_disponibles = df.columns.tolist()
 
-# Extraction automatique du champ demandé
+# Construction automatique d'alias pour les champs
+def generer_alias(df):
+    alias = {}
+    for col in df.columns:
+        alias_simple = col.lower()
+        alias_simple = alias_simple.replace("_", " ")
+        alias_simple = re.sub(r"[^a-z0-9 ]", "", alias_simple)
+        mots = alias_simple.split()
+        for mot in mots:
+            if mot not in alias:
+                alias[mot] = col
+    return alias
+
+alias_champs = generer_alias(df)
+
+# Extraction du champ demandé
 def extraire_champ(question):
-    question_lower = question.lower()
-    for champ in champs_disponibles:
-        champ_simplifie = champ.replace("_", " ").replace("(", "").replace(")", "")
-        if any(mot in question_lower for mot in champ_simplifie.split()):
-            return champ
+    question = question.lower()
+    for mot in question.split():
+        mot_clean = re.sub(r"[^a-z0-9]", "", mot)
+        if mot_clean in alias_champs:
+            return alias_champs[mot_clean]
     return None
 
-# Nettoyage du libellé produit supposé
-def extraire_terme_recherche(question, champ_detecte):
-    nettoyé = re.sub(rf"\b({champ_detecte.replace('_', ' ')})\b", "", question, flags=re.I)
-    mots = re.findall(r"\w{3,}", nettoyé.lower())
+# Extraction du libellé recherché
+def extraire_produit(question, champ_detecte):
+    champ_clean = champ_detecte.replace("_", " ")
+    question_sans_champ = re.sub(rf"\b{champ_clean}\b", "", question, flags=re.I)
+    mots = re.findall(r"\w{3,}", question_sans_champ.lower())
     return " ".join(mots)
 
-# Interface
-st.title("🔎 Assistant Catalogue Boutté — langage naturel")
-question = st.text_input("Pose une question comme : « Quel est le code EAN du nez de robinet 15x21 ? »")
+# Interface Streamlit
+st.title("🧠 Assistant Catalogue Boutté — questions naturelles")
+question = st.text_input("Exemples : Quel est le GTIN du bouchon 20x27 ? | Quelle est la matière du nez de robinet ?")
 
 if question:
     champ = extraire_champ(question)
     if not champ:
-        st.warning("Je n’ai pas compris quel champ tu recherches. Reformule ou sois plus précis.")
+        st.error("❌ Je n’ai pas reconnu le champ demandé. Reformule ta question.")
     else:
-        lib_recherche = extraire_terme_recherche(question, champ)
-        resultat = df[df["libellé_du_produit_(libre)"].str.contains(lib_recherche, case=False, na=False)]
+        produit_texte = extraire_produit(question, champ)
+        resultat = df[df["libellé_du_produit_(libre)"].str.contains(produit_texte, case=False, na=False)]
 
         if resultat.empty:
-            st.warning(f"Aucun produit trouvé contenant : `{lib_recherche}`")
+            st.warning(f"Aucun produit trouvé correspondant à : `{produit_texte}`")
         else:
             valeur = resultat[champ].values[0]
-            produit = resultat["libellé_du_produit_(libre)"].values[0]
-            st.success(f"🔍 **{champ.replace('_', ' ').capitalize()}** pour **{produit}** : `{valeur}`")
+            libelle = resultat['libellé_du_produit_(libre)'].values[0]
+            st.success(f"✅ **{champ.replace('_', ' ').capitalize()}** pour **{libelle}** : `{valeur}`")
