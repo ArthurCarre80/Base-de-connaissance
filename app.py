@@ -8,25 +8,23 @@ def charger_donnees():
     return pd.read_excel("Produits boutté.xlsx")
 
 df = charger_donnees()
+colonnes = df.columns.str.lower().str.strip()
 
-st.title("🔍 Catalogue Boutté - Recherche Produits")
+st.title("🔍 Catalogue Boutté - Recherche intelligente")
 
-recherche = st.text_input("🔎 Rechercher (valeur présente dans n'importe quelle colonne)")
+recherche = st.text_input("Exemples : 'code interne 3160140100316', 'poids 1220', 'PVC gris', 'référence 000651'")
+
+def filtrer_lignes(query, data):
+    mots = query.lower().strip().split()
+    masque = pd.Series([True] * len(data))
+    for mot in mots:
+        present = data.astype(str).apply(lambda col: col.str.lower().str.contains(mot, na=False))
+        masque &= present.any(axis=1)
+    return data[masque]
 
 if recherche:
-    # Filtrer
-    mask = df.apply(lambda row: row.astype(str).str.contains(recherche, case=False, na=False).any(), axis=1)
-    resultats = df[mask].copy()
-
-    # Surlignage
-    def surligner(val):
-        val_str = str(val)
-        if recherche.lower() in val_str.lower():
-            return f"background-color: yellow"
-        return ""
-
-    styled = resultats.style.applymap(surligner)
-    st.write(f"🔍 Résultats pour : `{recherche}`")
-    st.dataframe(styled, use_container_width=True)
+    resultats = filtrer_lignes(recherche, df)
+    st.write(f"🔍 {len(resultats)} résultat(s) pour : `{recherche}`")
+    st.dataframe(resultats, use_container_width=True)
 else:
     st.dataframe(df.head(50), use_container_width=True)
