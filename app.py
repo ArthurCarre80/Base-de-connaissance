@@ -8,23 +8,38 @@ def charger_donnees():
     return pd.read_excel("Produits boutté.xlsx")
 
 df = charger_donnees()
-colonnes = df.columns.str.lower().str.strip()
+colonnes = df.columns.str.lower()
 
-st.title("🔍 Catalogue Boutté - Recherche intelligente")
+st.title("🔍 Recherche inversée - Catalogue Boutté")
 
-recherche = st.text_input("Exemples : 'code interne 3160140100316', 'poids 1220', 'PVC gris', 'référence 000651'")
+recherche = st.text_input("Tapez une valeur connue + le champ souhaité (ex : '000651 libellé', 'Lance 20x27 référence')")
 
-def filtrer_lignes(query, data):
-    mots = query.lower().strip().split()
-    masque = pd.Series([True] * len(data))
+def recherche_inversee(input_text):
+    mots = input_text.lower().strip().split()
+    if not mots:
+        return pd.DataFrame()
+    
+    champ_cible = None
+    # Identifier si un des mots correspond à une colonne
     for mot in mots:
-        present = data.astype(str).apply(lambda col: col.str.lower().str.contains(mot, na=False))
-        masque &= present.any(axis=1)
-    return data[masque]
+        if mot in colonnes.values:
+            champ_cible = mot
+            mots.remove(mot)
+            break
+    
+    filtre = df[df.apply(lambda row: all(any(mot in str(val).lower() for val in row) for mot in mots), axis=1)]
+    
+    if champ_cible:
+        if champ_cible in colonnes.values:
+            return filtre[[champ_cible]]
+    return filtre
 
 if recherche:
-    resultats = filtrer_lignes(recherche, df)
-    st.write(f"🔍 {len(resultats)} résultat(s) pour : `{recherche}`")
-    st.dataframe(resultats, use_container_width=True)
+    resultat = recherche_inversee(recherche)
+    if not resultat.empty:
+        st.write(f"🎯 Résultat pour : `{recherche}`")
+        st.dataframe(resultat, use_container_width=True)
+    else:
+        st.warning("Aucun résultat trouvé.")
 else:
-    st.dataframe(df.head(50), use_container_width=True)
+    st.info("🔎 Exemple : `000651 libellé` ou `Lance 20x27 référence`")
